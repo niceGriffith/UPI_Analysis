@@ -1,0 +1,238 @@
+---
+title: "Time Series Analysis of UPI Data"
+author: "[Debaditya Chakraborty](https://twitter.com/bjblazkowiczzz)"
+date: "`r Sys.Date()`"
+output: 
+  word_document:
+    toc: yes
+    highlight: tango
+    fig_width: 7
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache = TRUE,warning = FALSE,message = FALSE,fig.align = "center")
+```
+
+\newpage
+
+# **Introduction**
+
+Yet to be written\
+reference_docx: "C:\\Users\\Debaditya\\Documents\\R Projects\\reference_creation.docx" \## **Abstract**
+
+Yet to be written.
+
+This is just the introductory part of the analysis there are still things i wish to add into this. \newpage
+
+```{r echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
+#Loading Essential Libraries####
+library(randtests)
+library(broom)
+library(ggplot2)
+library(dplyr)
+library(xlsx)
+library(ggplot2)
+library(tseries)
+library(ggspectra)
+library(forecast)
+library(ggspectra)
+library(gt)
+library(gtExtras)
+library(ggthemes)
+library(ggfortify)
+library(tidyr)
+library(prettydoc)
+library(hrbrthemes)
+library(knitr)
+library(gridExtra)
+```
+
+# **1.Analyzing Monthly UPI Transaction(From 2016 to 2024)**
+
+## *1.1 The Data*
+
+```{r echo=FALSE, message=FALSE}
+#loading the dataset####
+upi<-xlsx::read.xlsx(file = "C:\\Users\\Debaditya\\Documents\\Project_Work\\UPI_Analytics.xlsx" ,sheetIndex = 1)
+#converting the dataset to a dataframe for ease#### 
+upi<-as.data.frame(upi)
+#reversing the oreer of rows since we want the data to begin from 2016-04####
+data1<-as.data.frame(t(rev(as.data.frame(t(upi)))))
+colnames(data1)<-c("Month","No. of Banks live on UPI","Volume(In Mn)","Value(In Cr)","Volume(In Cr)")
+gt1<-gt(head(data1,n = 10))
+gt1<-gt1%>%tab_header(title = md("**Monthly UPI Transaction\n Value &Volume**"),subtitle = md("*2016 to 2024*"))%>%tab_source_note(source_note = md("*Source*:National Payments Corporation of India (NPCI)"))%>%gt_theme_espn()
+gt1
+```
+
+Only the first 10 rows are shown for convenience.The volumes have been converted to crore from million.
+
+-   **Converting the data into a time series object**
+
+```{r}
+val_time<-ts(data=as.numeric(data1$`Value(In Cr)`),start = c(2016,4),end=c(2024,2),deltat = 1/12)
+vol_time<-ts(data=as.numeric(data1$`Volume(In Cr)`),start = c(2016,4),end=c(2024,2),deltat = 1/12)
+per_trans<-ts(data=val_time/vol_time,start = c(2016,4),end = c(2024,2),deltat=1/12)
+bank_num<-ts(data=as.numeric(data1$`No. of Banks live on UPI`),start=c(2016,4),end=c(2024,2),deltat = 1/12)
+```
+
+\newpage
+
+## **1.2 Exploratory Analysis**
+
+### Plot showing the growth of Upi Transaction volume and Transaction amount overtime(2016-2024)
+
+```{r echo=FALSE, warning=FALSE}
+ggplot()+
+  geom_line(data = upi,mapping = aes(x=upi$Month,y=upi$Value..in.Cr..,color="Value in Cr"),linewidth=1)+
+  geom_line(data = upi,mapping = aes(x=upi$Month,y=upi$Volume..in.Cr..,color="Volume in Cr"),linewidth=1)+
+  labs(x = "Time",
+         y = "Volume & Value In Cr",
+         color = "",title = "UPI Transaction Value & Volume",caption = "Source : NPCI")+
+  theme_economist()
+```
+
+As it can be seen the transaction amounts are much larger than the volume so it is not possible to contain them in the same graph and compare their growth simultaneously. To solve this problem we use the log transformation for both variables to bring them in a comparable range.
+
+### Plot after log transform
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot()+
+  geom_line(data = upi,mapping = aes(x=upi$Month,y=log(upi$Value..in.Cr..),color="ln(Value in Cr)"),linewidth=1)+
+  geom_line(data = upi,mapping = aes(x=upi$Month,y=log(upi$Volume..in.Cr..),color="ln(Volume in Cr"),linewidth=1)+
+  labs(x="Time",y="UPI Transaction amount & Volume in Cr",title="UPI Value & Volume of transactions over time",subtitle = "Data has been log transformed",color="",caption = "Source : NPCI")+
+  theme_economist()
+
+```
+
+Now we can see the growth of both factors simultaneously and as we would've guessed the growth of UPI transaction volume and Transaction Amount is nearly identical even though the difference between their values is very high. This is due to the fact that each individual transaction results in some amount of money being transferred which can range from very small to very high values.It is hard to observe the presence of trend and seasonal components from this so we plot value and volume in separate plots.
+
+### Plot of Value and Volume of transactions per month.
+
+```{r echo=FALSE,warning=FALSE,fig.width= 10 }
+plot1<-ggplot()+
+  geom_line(data = upi,mapping = aes(x=upi$Month,y=upi$Value..in.Cr..,color="Value in Cr"),linewidth=1)+
+  labs(x = "Time",
+         y = "Value In Cr",
+         color = "",title = "UPI Monthly Transaction Value ",subtitle = "2016-2024",caption = "Source : NPCI")+
+  theme_economist()
+
+plot2<-ggplot()+
+  geom_line(data = upi,mapping = aes(x=upi$Month,y=upi$Volume..in.Cr..,color="Volume in Cr"),linewidth=1)+scale_color_manual(values = "yellow3")+
+  labs(x = "Time",
+         y = "Volume In Cr",
+         color = "",title = "UPI Monthly Transaction Volume",subtitle = "2016-2024",caption = "Source :lue NPCI")+
+  theme_economist()
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+The presence of a strong secular trend is visible with some random fluctuations in both of the plots. There isn't a very strong seasonal effect that can be identified from the plot. We can also see the impact of *COVID-19* as there is a significant change in both metrics during the start of *COVID-19* pandemic .We can also since post pandemic the increase in value of transaction has been rapid , there might be an underlying effect of *inflation* in this which we may analyze ahead.
+
+### Plot of Average Transaction value.
+
+```{r echo=FALSE, warning=FALSE}
+regions <- tibble(x1 =as.Date("2016-04-01") , x2 = as.Date("2017-11-01"), y1 = -Inf, y2 = +Inf)
+autoplot(per_trans,ts.colour = "blue4",ts.size =1)+
+  geom_rect(data = regions,
+            inherit.aes = FALSE,
+            mapping = aes(xmin = x1, xmax = x2,
+                          ymin = y1, ymax = y2),
+            color = "transparent",
+            fill = "blue",
+            alpha = .2)+
+geom_vline(xintercept = as.numeric(as.Date("2017-11-01")),linetype="dashed",color="green")+
+  theme_economist(base_size = 3)+
+  labs(y="Amount Per Transaction in Rupee",x="Time",title = "Average Transaction value per upi transaction",caption = "Source : NPCI")
+```
+
+From the plot we can see that the average transaction value between the period of initialization(2016) and upto 2018( *marked by the green dashed line* )has been extremely *high* as during this initial period upi was used by a selected few individuals. . Overtime with easier access of internet UPI started to become a mainstream method of payment and as the data shows the average transaction value per transaction is *decreasing slowly* this shows as time increases people are using UPI for more and more smaller transactions.It might be worth it to check a box plot for possible outliers in the data.
+
+### Plot of Average transaction value post September 2018
+
+```{r echo=FALSE}
+#ggplot()+geom_boxplot(mapping=aes(y=per_trans),outlier.colour = "red")
+per_trans_1<-ts(per_trans[25:95],start = c(2018,4),deltat=1/12)
+autoplot(per_trans_1,ts.colour = "blue4",ts.size =1)+
+  theme_economist(base_size = 6)+
+  labs(y="Amount Per Transaction in Rupee",x="Time",title = "Average Transaction value per upi transaction",caption = "Source : NPCI")
+```
+
+In this period we can observe the average transaction value stabilizing around 1300-1500₹ and a slow decline can be seen as well. This timeseries might be of special interest as it is the only one so far which does not show a strong secular trend and there are no visible seasonal fluctuations as well.It will be best to avoid the deterministic procedures for this time series so we will be analyzing this object only using stochastic analysis methods.
+
+
+### Plot of Number of Banks live in UPI.
+
+```{r echo=FALSE, warning=FALSE}
+autoplot(bank_num,ts.colour = "green4",ts.size =1)+
+  theme_economist(base_size = 6)+
+  labs(y="Number of Banks",x="Time",title = "Number of Banks Live on UPI",subtitle = "2016-2024",caption = "Source : NPCI")
+```
+
+Number banks allowing UPI registration is growing rapidly this indicates at the growth of financial inclusion among the population of India the more banks especially regional banks allow UPI registrations the better will be the penetretation of digitization of payments throughout the country.
+
+
+*Table 2*  
+```{r echo=FALSE}
+summ<-rbind(summary(val_time),summary(vol_time),summary(per_trans),summary(per_trans_1))
+rownames(summ)<-c("Value","Volume","Avg. Transaction Val","Avg. Transaction Val(Post 2018 Sept)")
+kable(summ,caption = "Summary Statistics for UPI Monthly Metrics")
+
+```
+
+\pagebreak
+
+## Time Series Analysis(Deterministic Methods to analyze Trend and Seasonality)
+
+* **Here we have 4 time series objects**
+
+-   val_time:Value of UPI transactions per month (In Crore,Rupee)
+-   vol_time:Volume of UPI transactions per month(In crore)
+-   per trans:Average transaction amount per UPI transaction in each month(In rupee).
+-   bank_num: Total number of registered banks on UPI.
+
+
+From the exploratory analysis we found that that 3 of these time series contained a significant amount of secular positive trend with some underlying random component.
+
+### Decomposing Time series objects.
+
+-   Here our assumed model is 
+$$ 
+    Y_t=T_t+e_t 
+$$  where $Y_t$ , $T_t$ and $e_t$ represent The original time series , Trend component and error component respectively.  
+
+> > To do this we use the `decompose()` function in the "stats" package . This function as per the given choice of the model ( *i.e* additive or multiplicative model) breaks down the time series into trend,seasonal and error components using the classical sesonal decomposition. We assume the model to only contain trend and error components so we will have to make some adjustments to account for the change, cause otherwise it will calculate the residuals by subtracting the hypothetical sesonal component.
+
+### Decomposing val time
+
+This time series is the monthly total Value of transaction(In Crore. Rupee) in UPI.Here is the decomposed object:
+
+```{r echo=FALSE , warning=FALSE}
+decomp_val<-decompose(val_time)
+#tru_rem<-(val_time-decomp_val$trend)
+#tru_decomp<-list(val_time,decomp_val$trend,)
+autoplot(decomp_val)+ggtitle(label ="Decompostion of Additive Time series " )+theme_clean()+theme(plot.title = element_text(hjust = 0.5),text = element_text(family = "serif"),axis.text.y= element_text(size = 7))
+```
+
+-   **Trend** -Here the trend values are calculated using a 6 month moving average this was by default chosen by the decompose function of R.From the plot we can observe a very strong increasing trend in the monthly total value of transactions,we can see that the trend picks up very slowly between 2016 to 2020 and after 2020 a rapid increase with time can be seen.
+-   **Seasonality** - Even though our data does not contain any visible seasonal patterns the `decompose()` function returns a default seasonal component result which as per inspection is unsatisfactory.The Calculated seasonal figures are-
+```{r echo= FALSE }
+decomp_val$figure
+
+```
+
+- **Remainder** - The remainder stays somewhat stable until 2020 i.e the variance remains constant up until this period after which there is a spike in the plot and further increase in time shows rather big fluctuations. Certain tests for randomness can be performed to check for adequacy of our model selection per we can use the _Turning Point Test_ by Bienaymé 
+
+```{r}
+qqnorm(decomp_val$random)
+kable(tidy(shapiro.test(decomp_val$random)),digits = 3)
+acf(decomp_val$random,na.action = na.pass )
+
+```
+
+From the qqplot we can see that the points do not properly line up and from the p value of the shapiro wilks test we get further evidence that the random component is not normally distributed.This instability of the variance can hamper our forecasts.
+
+### Decomposing per_trans
+
+```{r warning=FALSE,fig.width=7}
+decomp_per<-decompose(per_trans)
+autoplot(decomp_per)+labs(y="Transaction Value")+ggtitle(label ="Decompostion of Additive Time series " )+theme_clean()+theme(plot.title = element_text(hjust = 0.5),text = element_text(family = "serif"),axis.text.y= element_text(size = 7))
+```
