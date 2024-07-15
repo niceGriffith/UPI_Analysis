@@ -1,0 +1,54 @@
+---
+title: "Reference_doc"
+author: "[Debaditya Chakraborty](https://twitter.com/bjblazkowiczzz)"
+date: "`r Sys.Date()`"
+output:
+  word_document:
+    number_sections: TRUE
+    reference_docx: reference_creation.docx
+    toc: yes
+    highlight: tango
+    fig_width: 7
+bibliography: The_Analysis_of_Time_Series.bibtex
+link-citations: true
+reference-section-title: "References"
+new_session: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Header1
+
+## header 2
+
+### Header3
+
+Normal
+
+_italics_
+
+**bold**
+
+* list1
+* list2
+```{r}
+library(gt)
+library(gtExtras)
+gt1<-gt(head(datasets::airquality,n = 15))
+gt1<-gt1%>%tab_header(title = md("**Monthly UPI Transaction\n (Value &Volume)**"),subtitle = md("*2016 to 2024*"))%>%tab_source_note(source_note = md("*Source*:National Payments Corporation of India (NPCI)"))%>%gt_theme_nytimes()
+gt1
+```
+This is normal text
+Plot
+```{r}
+plot(airquality$Ozone)
+```
+```{r}
+library(knitr)
+library(xts)
+upi<-xlsx::read.xlsx(file = "C:\\Users\\Debaditya\\Documents\\Project_Work\\UPI_Analytics.xlsx" ,sheetIndex = 1)
+kable(upi)
+```
+
