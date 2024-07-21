@@ -38,8 +38,6 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
-.pdf_check.Rmd
-.Time_series_anal.Rmd
 # pkgdown site
 docs/
 
